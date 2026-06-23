@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexNews - Your News & Video Hub</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="logo">
+        <span class="logo-icon">▶</span>
+        <span class="logo-text">NexNews</span>
+    </div>
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search news and videos...">
+        <button onclick="searchContent()">🔍</button>
+    </div>
+    <nav class="nav-links">
+        <a href="index.html" class="active">Home</a>
+        <a href="news.html">News</a>
+        <a href="videos.html">Videos</a>
+        <a href="admin.html">Admin</a>
+    </nav>
+</header>
+
+<main class="main-content">
+    <section class="hero">
+        <h1>Welcome to NexNews</h1>
+        <p>Stay updated with breaking news and trending videos from around the world.</p>
+        <a href="news.html" class="hero-btn">Explore News</a>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2>📰 Latest News</h2>
+            <a href="news.html" class="view-all">View All →</a>
+        </div>
+        <div class="news-grid" id="newsGrid"></div>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2>🎬 Featured Videos</h2>
+            <a href="videos.html" class="view-all">View All →</a>
+        </div>
+        <div class="video-grid" id="videoGrid"></div>
+    </section>
+</main>
+
+<footer class="footer">
+    <div class="footer-bottom">© 2026 NexNews. All rights reserved.</div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        renderHome();
+    });
+</script>
+</body>
+</html>

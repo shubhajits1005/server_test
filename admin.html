@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - NexNews</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+<div class="admin-login" id="loginScreen">
+    <div class="login-card">
+        <h2>🔒 Admin Login</h2>
+        <input type="text" id="adminUser" placeholder="Username" autocomplete="off">
+        <input type="password" id="adminPass" placeholder="Password" autocomplete="new-password">
+        <button onclick="login()">Login</button>
+        <p class="login-hint">Default: admin / admin123</p>
+    </div>
+</div>
+
+<div class="admin-dashboard" id="dashboardScreen" style="display:none;">
+    <header class="admin-header">
+        <h1>🛠️ Admin Dashboard</h1>
+        <button onclick="logout()" class="logout-btn">Logout</button>
+    </header>
+
+    <nav class="admin-tabs">
+        <button class="tab-btn active" onclick="showTab('newsTab', this)">📰 Manage News</button>
+        <button class="tab-btn" onclick="showTab('videosTab', this)">🎬 Manage Videos</button>
+        <button class="tab-btn" onclick="showTab('statsTab', this)">📊 Statistics</button>
+        <button class="tab-btn" onclick="showTab('accountTab', this)">⚙️ Account</button>
+    </nav>
+
+    <section class="admin-tab" id="newsTab">
+        <h2>Add News Article</h2>
+        <form id="newsForm" onsubmit="addNews(event)">
+            <input type="text" id="newsTitle" placeholder="News Title" required>
+            <input type="text" id="newsCategory" placeholder="Category (e.g., Tech, Politics)" required>
+            <input type="text" id="newsImage" placeholder="Image URL (optional)">
+            <textarea id="newsContent" placeholder="News Content..." rows="6" required></textarea>
+            <button type="submit">Publish News</button>
+        </form>
+
+        <h2>Published News</h2>
+        <div class="admin-list" id="adminNewsList"></div>
+    </section>
+
+    <section class="admin-tab" id="videosTab" style="display:none;">
+        <h2>Add Video</h2>
+        <form id="videoForm" onsubmit="addVideo(event)">
+            <input type="text" id="videoTitle" placeholder="Video Title" required>
+            <input type="text" id="videoCategory" placeholder="Category" required>
+            <input type="text" id="videoThumb" placeholder="Thumbnail URL (optional)">
+            <input type="text" id="videoUrl" placeholder="Video URL or Embed (YouTube link ok)" required>
+            <textarea id="videoDesc" placeholder="Video Description..." rows="4" required></textarea>
+            <button type="submit">Publish Video</button>
+        </form>
+
+        <h2>Published Videos</h2>
+        <div class="admin-list" id="adminVideoList"></div>
+    </section>
+
+    <section class="admin-tab" id="statsTab" style="display:none;">
+        <h2>📊 Site Statistics</h2>
+        <div class="stats-grid" id="statsGrid"></div>
+    </section>
+
+    <section class="admin-tab" id="accountTab" style="display:none;">
+        <h2>⚙️ Change Username & Password</h2>
+        <form id="accountForm" onsubmit="changeCredentials(event)">
+            <input type="text" id="currentUser" placeholder="Current Username" required autocomplete="off">
+            <input type="password" id="currentPass" placeholder="Current Password" required autocomplete="current-password">
+            <input type="text" id="newUser" placeholder="New Username" required autocomplete="off">
+            <input type="password" id="newPass" placeholder="New Password" required autocomplete="new-password">
+            <input type="password" id="confirmPass" placeholder="Confirm New Password" required autocomplete="new-password">
+            <button type="submit">Save Changes</button>
+        </form>
+        <p class="login-hint">You will be logged out after changing your credentials.</p>
+    </section>
+</div>
+
+<script src="script.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (sessionStorage.getItem('isAdmin') === 'yes') {
+            showDashboard();
+        }
+    });
+</script>
+</body>
+</html>
