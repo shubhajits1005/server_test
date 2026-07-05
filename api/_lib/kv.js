@@ -1,4 +1,4 @@
-const { put, head } = require('@vercel/blob');
+const { put, list } = require('@vercel/blob');
 
 const BLOB_KEY = 'short-news-data.json';
 
@@ -25,20 +25,23 @@ const DEFAULTS = {
 
 async function getData() {
   try {
-    // head() looks up blob by pathname and returns its URL
-    const blob = await head(BLOB_KEY);
-    if (!blob || !blob.url) throw new Error('Blob not found');
+    const result = await list({ prefix: BLOB_KEY });
+    const blobs = result.blobs || [];
+    if (blobs.length === 0) throw new Error('No blobs');
 
-    // For private blobs, pass auth token when fetching the URL
+    // Blobs are sorted newest-first by default
+    const latest = blobs[0];
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    const res = await fetch(blob.url, {
+
+    // Private blobs need auth header to read
+    const res = await fetch(latest.url, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     });
     if (!res.ok) throw new Error(`Fetch returned ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error('getData failed:', err.message);
-    // First visit — seed defaults to blob storage
+    console.error('getData:', err.message);
+    // First visit — seed defaults
     await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
       contentType: 'application/json',
       access: 'private',
