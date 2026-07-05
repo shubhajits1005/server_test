@@ -11,7 +11,9 @@ async function api(url, data) {
     });
     return res.json();
   }
-  const res = await fetch(url);
+  // Cache-busting: add timestamp to prevent Vercel CDN caching
+  const separator = url.includes('?') ? '&' : '?';
+  const res = await fetch(url + separator + '_=' + Date.now());
   return res.json();
 }
 
