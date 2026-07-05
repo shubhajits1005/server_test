@@ -1,33 +1,39 @@
-/* ===== Default seed data (first visit) ===== */
-const DEFAULT_NEWS = [
-  { "id": 1, "title": "AI Breakthrough Reshapes Industry", "category": "Tech", "date": "2026-06-22", "image": "", "icon": "🤖", "excerpt": "A new model achieves human-level reasoning on benchmark tests, signaling a leap forward for the field.", "content": "Researchers announced a major breakthrough today as the new model surpassed human baselines on a suite of reasoning benchmarks. Industry experts say the result will accelerate deployment across healthcare, finance, and education. The team plans to open-source the evaluation suite next month." },
-  { "id": 2, "title": "Global Markets Hit Record Highs", "category": "Business", "date": "2026-06-21", "image": "", "icon": "📈", "excerpt": "Equities rallied worldwide as central banks signaled a coordinated easing cycle.", "content": "Stock indexes closed at record highs across major exchanges. The rally was driven by dovish commentary from several central bank officials. Analysts expect continued momentum into the next quarter, though some warn of stretched valuations in tech." },
-  { "id": 3, "title": "Mars Mission Reaches Orbit", "category": "Science", "date": "2026-06-20", "image": "", "icon": "🚀", "excerpt": "A crewed mission successfully entered Martian orbit, paving the way for a surface landing next year.", "content": "The spacecraft completed a 7-minute orbital insertion burn on schedule. The crew of four reported all systems nominal and are preparing for a survey of candidate landing sites. The mission is the first crewed flight beyond the Moon." },
-  { "id": 4, "title": "Climate Summit Reaches Historic Deal", "category": "World", "date": "2026-06-19", "image": "", "icon": "🌍", "excerpt": "Nations agreed on a binding framework to phase out coal by 2035.", "content": "After two weeks of negotiation, delegates from 195 countries signed a binding agreement to phase out unabated coal power by 2035. The deal includes a $200B annual fund to support developing nations in the transition." },
-  { "id": 5, "title": "Quantum Internet Demo Succeeds", "category": "Tech", "date": "2026-06-18", "image": "", "icon": "⚛️", "excerpt": "Entangled photons linked three cities in a working quantum network prototype.", "content": "Engineers demonstrated quantum key distribution across a 600km network linking three metropolitan areas. The test marks a major step toward a continent-scale quantum internet within the next decade." },
-  { "id": 6, "title": "Football Championship Final Set", "category": "Sports", "date": "2026-06-17", "image": "", "icon": "⚽", "excerpt": "Two underdogs will meet in the final after dramatic semi-final upsets.", "content": "In a weekend of surprises, both favored teams were eliminated in the semi-finals. The final is scheduled for next Sunday and is expected to draw a record global audience." }
-];
+/* ===== Storage (server-based via Vercel KV) ===== */
 
-const DEFAULT_VIDEOS = [
-  { "id": 1, "title": "How AI Models Actually Think", "category": "Tech", "thumb": "", "icon": "🤖", "desc": "A clear walkthrough of how modern AI systems process language and produce responses.", "url": "https://www.youtube.com/embed/aircAruvnKk" },
-  { "id": 2, "title": "Inside the Mars Mission Control", "category": "Science", "thumb": "", "icon": "🚀", "desc": "Behind the scenes with the engineers who pulled off the historic orbital insertion.", "url": "https://www.youtube.com/embed/D8pVLgHaViY" },
-  { "id": 3, "title": "Markets Explained in 10 Minutes", "category": "Business", "thumb": "", "icon": "📈", "desc": "A quick, jargon-free tour of how global equity markets actually work.", "url": "https://www.youtube.com/embed/ZCFkWDdmXG8" },
-  { "id": 4, "title": "Quantum Computing for Beginners", "category": "Science", "thumb": "", "icon": "⚛️", "desc": "Qubits, superposition, and entanglement — explained without the math.", "url": "https://www.youtube.com/embed/QuR969cFz_g" },
-  { "id": 5, "title": "Climate Tech: What Actually Works", "category": "World", "thumb": "", "icon": "🌍", "desc": "A grounded look at which climate technologies are delivering real emissions cuts.", "url": "https://www.youtube.com/embed/1LaJ5DDmsvk" },
-  { "id": 6, "title": "Top 10 Goals of the Season", "category": "Sports", "thumb": "", "icon": "⚽", "desc": "A countdown of the most spectacular goals from this season's championships.", "url": "https://www.youtube.com/embed/2vjPBrBU-TM" }
-];
+let __linkTarget = '_blank';
 
-const DEFAULT_CREDENTIALS = { username: "admin", password: "admin123" };
+async function api(url, data) {
+  if (data !== undefined) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  }
+  const res = await fetch(url);
+  return res.json();
+}
 
-/* ===== Storage (localStorage) ===== */
-function getNews()    { return JSON.parse(localStorage.getItem('shortnews_news')) || DEFAULT_NEWS; }
-function saveNews(list)   { localStorage.setItem('shortnews_news', JSON.stringify(list)); }
-function getVideos()      { return JSON.parse(localStorage.getItem('shortnews_videos')) || DEFAULT_VIDEOS; }
-function saveVideos(list) { localStorage.setItem('shortnews_videos', JSON.stringify(list)); }
-function getCredentials() { return JSON.parse(localStorage.getItem('shortnews_creds')) || DEFAULT_CREDENTIALS; }
-function saveCredentials(c) { localStorage.setItem('shortnews_creds', JSON.stringify(c)); }
-function getLinkTarget()  { return localStorage.getItem('shortnews_linkTarget') || '_blank'; }
-function setLinkTarget(t) { localStorage.setItem('shortnews_linkTarget', t); }
+async function getNews()    { return api('/api/news'); }
+async function saveNews(list)   { await api('/api/news', list); }
+async function getVideos()      { return api('/api/videos'); }
+async function saveVideos(list) { await api('/api/videos', list); }
+async function getCredentials() { return api('/api/credentials'); }
+async function saveCredentials(c) { await api('/api/credentials', c); }
+
+function getLinkTarget() { return __linkTarget; }
+async function setLinkTarget(t) {
+  __linkTarget = t;
+  await api('/api/prefs', { linkTarget: t });
+}
+
+async function initLinkTarget() {
+  try {
+    const prefs = await api('/api/prefs');
+    __linkTarget = prefs.linkTarget || '_blank';
+  } catch { __linkTarget = '_blank'; }
+}
 
 /* ===== Helpers ===== */
 function escapeHtml(s) {
@@ -537,7 +543,9 @@ async function setupAdminPrefs() {
   setupLinkPreview('videoLinkUrl', 'videoLinkLabel', 'videoLinkPreview');
 
   // Initialize the radio from saved value
-  const saved = getLinkTarget();
+  const prefs = await api('/api/prefs');
+  const saved = (prefs && prefs.linkTarget) || '_blank';
+  __linkTarget = saved;
   const radios = document.querySelectorAll('input[name="linkTarget"]');
   radios.forEach(r => { r.checked = (r.value === saved); });
 
@@ -582,6 +590,7 @@ function setupScrollAnimations() {
 
 /* ===== Page init ===== */
 async function initPage() {
+  await initLinkTarget();
   if (document.getElementById('newsGrid')) await renderHome();
   if (document.getElementById('newsList')) await renderNewsList();
   if (document.getElementById('videoGridFull')) await renderVideosFull();
