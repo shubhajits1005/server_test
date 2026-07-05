@@ -3,21 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Panel - NexNews</title>
+<title>Admin Panel - Short News</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body class="admin-body">
-<div class="admin-login" id="loginScreen">
-    <div class="login-card">
-        <h2>🔒 Admin Login</h2>
-        <input type="text" id="adminUser" placeholder="Username" autocomplete="off">
-        <input type="password" id="adminPass" placeholder="Password" autocomplete="new-password">
-        <button onclick="login()">Login</button>
-        <p class="login-hint">Default: admin / admin123</p>
+<div class="glass-container admin-glass">
+    <a href="index.html" class="back-home-floating">← Back to Home</a>
+    <div class="admin-login" id="loginScreen">
+        <div class="login-card">
+            <h2>🔒 Admin Login</h2>
+            <input type="text" id="adminUser" placeholder="Username" autocomplete="off">
+            <input type="password" id="adminPass" placeholder="Password" autocomplete="new-password">
+            <button onclick="login()">Login</button>
+            <p class="login-hint">Default: admin / admin123</p>
+        </div>
     </div>
-</div>
 
-<div class="admin-dashboard" id="dashboardScreen" style="display:none;">
+    <div class="admin-dashboard" id="dashboardScreen" style="display:none;">
     <header class="admin-header">
         <h1>🛠️ Admin Dashboard</h1>
         <button onclick="logout()" class="logout-btn">Logout</button>
@@ -27,6 +29,7 @@
         <button class="tab-btn active" onclick="showTab('newsTab', this)">📰 Manage News</button>
         <button class="tab-btn" onclick="showTab('videosTab', this)">🎬 Manage Videos</button>
         <button class="tab-btn" onclick="showTab('statsTab', this)">📊 Statistics</button>
+        <button class="tab-btn" onclick="showTab('prefsTab', this)">🔗 Link Behavior</button>
         <button class="tab-btn" onclick="showTab('accountTab', this)">⚙️ Account</button>
     </nav>
 
@@ -36,6 +39,9 @@
             <input type="text" id="newsTitle" placeholder="News Title" required>
             <input type="text" id="newsCategory" placeholder="Category (e.g., Tech, Politics)" required>
             <input type="text" id="newsImage" placeholder="Image URL (optional)">
+            <input type="text" id="newsLinkUrl" placeholder="Redirect Link (optional)">
+            <input type="text" id="newsLinkLabel" placeholder="Link Label (optional)">
+            <div id="newsLinkPreview" class="link-preview"></div>
             <textarea id="newsContent" placeholder="News Content..." rows="6" required></textarea>
             <button type="submit">Publish News</button>
         </form>
@@ -51,6 +57,9 @@
             <input type="text" id="videoCategory" placeholder="Category" required>
             <input type="text" id="videoThumb" placeholder="Thumbnail URL (optional)">
             <input type="text" id="videoUrl" placeholder="Video URL or Embed (YouTube link ok)" required>
+            <input type="text" id="videoLinkUrl" placeholder="Redirect Link (optional)">
+            <input type="text" id="videoLinkLabel" placeholder="Link Label (optional)">
+            <div id="videoLinkPreview" class="link-preview"></div>
             <textarea id="videoDesc" placeholder="Video Description..." rows="4" required></textarea>
             <button type="submit">Publish Video</button>
         </form>
@@ -76,15 +85,30 @@
         </form>
         <p class="login-hint">You will be logged out after changing your credentials.</p>
     </section>
+
+    <section class="admin-tab" id="prefsTab" style="display:none;">
+        <h2>🔗 Link Behavior</h2>
+        <p class="login-hint" style="text-align:left; max-width:520px; margin:0 0 14px;">Choose how redirect links in news and video posts open.</p>
+        <div class="prefs-row">
+            <label>
+                <input type="radio" name="linkTarget" value="_blank" checked>
+                <span>Open in new tab</span>
+            </label>
+            <label>
+                <input type="radio" name="linkTarget" value="_self">
+                <span>Open in same tab</span>
+            </label>
+        </div>
+        <button type="button" id="savePrefsBtn" style="margin-top:14px;">Save Preference</button>
+    </section>
+</div>
+
 </div>
 
 <script src="script.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        if (sessionStorage.getItem('isAdmin') === 'yes') {
-            showDashboard();
-        }
-    });
+    // Always require fresh login — clear any prior session on page load.
+    sessionStorage.removeItem('isAdmin');
 </script>
 </body>
 </html>

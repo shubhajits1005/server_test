@@ -45,55 +45,176 @@ function formatDate(d) {
     return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/* Extract a YouTube video id from any common YT URL form. Returns null if not YouTube. */
+function getYouTubeId(url) {
+    if (!url) return null;
+    try {
+        if (url.includes('youtube.com/embed/')) {
+            return url.split('youtube.com/embed/')[1].split(/[?&/]/)[0] || null;
+        }
+        if (url.includes('youtube.com/shorts/')) {
+            return url.split('youtube.com/shorts/')[1].split(/[?&/]/)[0] || null;
+        }
+        if (url.includes('watch?v=')) {
+            return url.split('watch?v=')[1].split('&')[0] || null;
+        }
+        if (url.includes('youtu.be/')) {
+            return url.split('youtu.be/')[1].split(/[?&/]/)[0] || null;
+        }
+    } catch { return null; }
+    return null;
+}
+
+function sanitizeUrl(u) {
+    try {
+        // URL constructor will throw for invalid urls
+        const url = new URL(u, location.origin);
+        if (['http:', 'https:', 'mailto:'].includes(url.protocol)) return url.href;
+    } catch (e) {
+        // attempt to add https:// if missing
+        try {
+            const url2 = new URL('https://' + u);
+            if (['http:', 'https:'].includes(url2.protocol)) return url2.href;
+        } catch (e2) { }
+    }
+    return 'about:blank';
+}
+
+/* Get the user's preferred link target: '_blank' (new tab) or '_self' (same tab). */
+function getLinkTarget() {
+    try {
+        return localStorage.getItem('nexnews_linkTarget') || '_blank';
+    } catch (e) { return '_blank'; }
+}
+function setLinkTarget(t) {
+    try { localStorage.setItem('nexnews_linkTarget', t); } catch (e) { }
+}
+
+/* Convert plain text URLs into safe anchor tags while keeping other text escaped */
+function autoLink(text) {
+    if (!text) return '';
+    // Escape full text first
+    let t = escapeHtml(text);
+    // Regex to find urls (basic)
+    const urlRegex = /((https?:\/\/|www\.)[^\s<]+)/g;
+    const target = getLinkTarget();
+    return t.replace(urlRegex, (m) => {
+        let href = m;
+        if (!href.match(/^https?:\/\//i)) href = 'https://' + href;
+        href = sanitizeUrl(href);
+        return `<a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(m)}</a>`;
+    });
+}
+
+/* Build a <picture>-style thumb block: custom > YouTube > icon. Uses lazy onerror fallback for YT. */
+function videoThumbHtml(v) {
+    if (v.thumb) {
+        return `<img class="video-thumb-img" src="${escapeHtml(v.thumb)}" alt="${escapeHtml(v.title || '')}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="video-thumb-fallback" style="display:none;">${v.icon || '🎬'}</div>`;
+    }
+    const ytId = getYouTubeId(v.url);
+    if (ytId) {
+        return `<img class="video-thumb-img" src="https://i.ytimg.com/vi/${ytId}/hqdefault.jpg" alt="${escapeHtml(v.title || '')}" loading="lazy" onerror="if(this.src.includes('hqdefault')){this.src='https://i.ytimg.com/vi/${ytId}/mqdefault.jpg';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}">
+                <div class="video-thumb-fallback" style="display:none;">${v.icon || '🎬'}</div>`;
+    }
+    return `<div class="video-thumb-fallback">${v.icon || '🎬'}</div>`;
+}
+
 /* ===== Renderers ===== */
 function newsCardHtml(n) {
+    // Build content with optional redirect link. The link can have custom label; if not provided the URL is shown.
+    let linkHtml = '';
+    if (n.linkUrl) {
+        const href = sanitizeUrl(n.linkUrl);
+        const label = n.linkLabel || n.linkUrl;
+        const target = getLinkTarget();
+        linkHtml = `<div class="news-card-link"><a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a></div>`;
+    }
+
     return `
-    <article class="news-card" onclick='openArticle(${n.id})'>
+    <article class="news-card" data-news-id="${n.id}">
         <div class="news-card-img">${n.icon || '📰'}</div>
         <div class="news-card-body">
             <span class="news-card-category">${escapeHtml(n.category)}</span>
             <h3 class="news-card-title">${escapeHtml(n.title)}</h3>
             <div class="news-card-meta">${formatDate(n.date)}</div>
-            <p class="news-card-excerpt">${escapeHtml(n.excerpt || '')}</p>
+            <p class="news-card-excerpt">${autoLink(n.excerpt || '')}</p>
+            ${linkHtml}
         </div>
     </article>`;
 }
 
+
+
 function newsListItemHtml(n) {
+    let linkHtml = '';
+    if (n.linkUrl) {
+        const href = sanitizeUrl(n.linkUrl);
+        const label = n.linkLabel || n.linkUrl;
+        const target = getLinkTarget();
+        linkHtml = `<div class="news-list-link"><a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a></div>`;
+    }
+
     return `
-    <article class="news-list-item" onclick='openArticle(${n.id})'>
+    <article class="news-list-item" data-news-id="${n.id}">
         <div class="news-list-thumb">${n.icon || '📰'}</div>
         <div>
             <span class="news-card-category">${escapeHtml(n.category)}</span>
             <h3 class="news-card-title">${escapeHtml(n.title)}</h3>
             <div class="news-card-meta">${formatDate(n.date)}</div>
-            <p class="news-card-excerpt">${escapeHtml(n.excerpt || '')}</p>
+            <p class="news-card-excerpt">${autoLink(n.excerpt || '')}</p>
+            ${linkHtml}
         </div>
     </article>`;
 }
 
+
 function videoCardHtml(v) {
+    // Build optional action link for video cards
+    let linkHtml = '';
+    if (v.linkUrl) {
+        const href = sanitizeUrl(v.linkUrl);
+        const label = v.linkLabel || v.linkUrl;
+        const target = getLinkTarget();
+        linkHtml = `<div class="video-card-link"><a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a></div>`;
+    }
+
     return `
-    <article class="video-card" onclick='openVideo(${v.id})'>
-        <div class="video-thumb">${v.icon || '🎬'}</div>
+    <article class="video-card" data-video-id="${v.id}">
+        <div class="video-thumb">
+            ${videoThumbHtml(v)}
+        </div>
         <div class="video-card-body">
             <span class="news-card-category">${escapeHtml(v.category)}</span>
             <h3 class="video-card-title">${escapeHtml(v.title)}</h3>
             <div class="video-card-meta">Click to watch</div>
+            <p class="video-card-excerpt">${autoLink(v.desc || '')}</p>
+            ${linkHtml}
         </div>
     </article>`;
 }
+
 
 function openArticle(id) {
     const n = getNews().find(x => x.id === id);
     if (!n) return;
     const body = document.getElementById('modalBody');
+
+    let linkHtml = '';
+    if (n.linkUrl) {
+        const href = sanitizeUrl(n.linkUrl);
+        const label = n.linkLabel || n.linkUrl;
+        const target = getLinkTarget();
+        linkHtml = `<div class="news-card-link" style="margin-top: 20px;"><a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a></div>`;
+    }
+
     body.innerHTML = `
         <div class="modal-image">${n.icon || '📰'}</div>
         <span class="news-card-category">${escapeHtml(n.category)}</span>
         <h2>${escapeHtml(n.title)}</h2>
         <div class="modal-meta">${formatDate(n.date)}</div>
-        <p>${escapeHtml(n.content || n.excerpt || '')}</p>
+        <p>${autoLink(n.content || n.excerpt || '')}</p>
+        ${linkHtml}
     `;
     document.getElementById('articleModal').classList.add('active');
 }
@@ -121,11 +242,21 @@ function openVideo(id) {
     } else {
         embed = `<div class="modal-image">${v.icon || '🎬'}</div>`;
     }
+
+    let linkHtml = '';
+    if (v.linkUrl) {
+        const href = sanitizeUrl(v.linkUrl);
+        const label = v.linkLabel || v.linkUrl;
+        const target = getLinkTarget();
+        linkHtml = `<div class="video-card-link" style="margin-top: 20px;"><a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a></div>`;
+    }
+
     body.innerHTML = `
         ${embed}
         <span class="news-card-category">${escapeHtml(v.category)}</span>
         <h2>${escapeHtml(v.title)}</h2>
-        <p>${escapeHtml(v.desc || '')}</p>
+        <p>${autoLink(v.desc || '')}</p>
+        ${linkHtml}
     `;
     document.getElementById('videoModal').classList.add('active');
 }
@@ -144,6 +275,7 @@ function renderNewsList() {
         return;
     }
     container.innerHTML = list.map(newsListItemHtml).join('');
+    animateChildren(container);
 }
 
 function renderVideosFull() {
@@ -155,13 +287,43 @@ function renderVideosFull() {
         return;
     }
     container.innerHTML = list.map(videoCardHtml).join('');
+    animateChildren(container);
 }
 
 function renderHome() {
     const news = getNews().slice(0, 6);
     const videos = getVideos().slice(0, 6);
-    document.getElementById('newsGrid').innerHTML = news.map(newsCardHtml).join('') || '<div class="empty">No news yet.</div>';
-    document.getElementById('videoGrid').innerHTML = videos.map(videoCardHtml).join('') || '<div class="empty">No videos yet.</div>';
+    const ng = document.getElementById('newsGrid');
+    const vg = document.getElementById('videoGrid');
+    if (ng) { ng.innerHTML = news.map(newsCardHtml).join('') || '<div class="empty">No news yet.</div>'; animateChildren(ng); }
+    if (vg) { vg.innerHTML = videos.map(videoCardHtml).join('') || '<div class="empty">No videos yet.</div>'; animateChildren(vg); }
+}
+
+function animateChildren(container) {
+    if (!container) return;
+    const kids = container.children;
+    for (let i = 0; i < kids.length; i++) {
+        kids[i].classList.add('fade-in');
+        kids[i].style.transitionDelay = (i * 0.05) + 's';
+    }
+    // Re-observe newly added elements
+    if ('IntersectionObserver' in window) {
+        if (!window.__animObserver) {
+            window.__animObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        window.__animObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+        }
+        for (let i = 0; i < kids.length; i++) {
+            window.__animObserver.observe(kids[i]);
+        }
+    } else {
+        for (let i = 0; i < kids.length; i++) kids[i].classList.add('visible');
+    }
 }
 
 /* ===== Search ===== */
@@ -203,9 +365,18 @@ function login() {
     const p = document.getElementById('adminPass').value;
     const creds = getCredentials();
     if (u === creds.username && p === creds.password) {
+        // Clear password from DOM/memory once auth succeeds.
+        const passEl = document.getElementById('adminPass');
+        if (passEl) passEl.value = '';
         sessionStorage.setItem('isAdmin', 'yes');
         showDashboard();
     } else {
+        // Wipe both fields and re-focus username for retry.
+        const uEl = document.getElementById('adminUser');
+        const pEl = document.getElementById('adminPass');
+        if (uEl) uEl.value = '';
+        if (pEl) pEl.value = '';
+        if (uEl) uEl.focus();
         alert('Invalid credentials.');
     }
 }
@@ -248,6 +419,7 @@ function showDashboard() {
     renderAdminNews();
     renderAdminVideos();
     renderStats();
+    setupAdminPrefs();
 }
 
 function showTab(id, btn) {
@@ -262,12 +434,14 @@ function addNews(e) {
     const title = document.getElementById('newsTitle').value.trim();
     const category = document.getElementById('newsCategory').value.trim();
     const image = document.getElementById('newsImage').value.trim();
+    const linkUrl = document.getElementById('newsLinkUrl') ? document.getElementById('newsLinkUrl').value.trim() : '';
+    const linkLabel = document.getElementById('newsLinkLabel') ? document.getElementById('newsLinkLabel').value.trim() : '';
     const content = document.getElementById('newsContent').value.trim();
     if (!title || !category || !content) return;
     const list = getNews();
     const id = list.length ? Math.max(...list.map(x => x.id)) + 1 : 1;
     const excerpt = content.length > 120 ? content.slice(0, 120) + '...' : content;
-    list.unshift({ id, title, category, image, content, excerpt, date: new Date().toISOString().slice(0,10), icon: '📰' });
+    list.unshift({ id, title, category, image, linkUrl, linkLabel, content, excerpt, date: new Date().toISOString().slice(0,10), icon: '📰' });
     saveNews(list);
     e.target.reset();
     renderAdminNews();
@@ -280,11 +454,13 @@ function addVideo(e) {
     const category = document.getElementById('videoCategory').value.trim();
     const thumb = document.getElementById('videoThumb').value.trim();
     const url = document.getElementById('videoUrl').value.trim();
+    const linkUrl = document.getElementById('videoLinkUrl') ? document.getElementById('videoLinkUrl').value.trim() : '';
+    const linkLabel = document.getElementById('videoLinkLabel') ? document.getElementById('videoLinkLabel').value.trim() : '';
     const desc = document.getElementById('videoDesc').value.trim();
     if (!title || !category || !url || !desc) return;
     const list = getVideos();
     const id = list.length ? Math.max(...list.map(x => x.id)) + 1 : 1;
-    list.unshift({ id, title, category, thumb, url, desc, icon: '🎬' });
+    list.unshift({ id, title, category, thumb, url, linkUrl, linkLabel, desc, icon: '🎬' });
     saveVideos(list);
     e.target.reset();
     renderAdminVideos();
@@ -359,8 +535,95 @@ function renderStats() {
     `;
 }
 
-/* Close modal on backdrop click */
+/* Delegated card clicks + modal backdrop close */
 document.addEventListener('click', e => {
+    const newsEl = e.target.closest('[data-news-id]');
+    if (newsEl) { openArticle(parseInt(newsEl.dataset.newsId, 10)); return; }
+    const vidEl = e.target.closest('[data-video-id]');
+    if (vidEl) { openVideo(parseInt(vidEl.dataset.videoId, 10)); return; }
     if (e.target.id === 'articleModal') closeModal();
     if (e.target.id === 'videoModal') closeVideoModal();
 });
+
+/* ===== Link URL preview in admin forms ===== */
+function updateLinkPreview(urlInputId, labelInputId, previewId) {
+    const urlEl = document.getElementById(urlInputId);
+    const labelEl = document.getElementById(labelInputId);
+    const previewEl = document.getElementById(previewId);
+    if (!urlEl || !previewEl) return;
+    const raw = urlEl.value.trim();
+    if (!raw) { previewEl.innerHTML = ''; previewEl.classList.remove('visible'); return; }
+    const href = sanitizeUrl(raw);
+    const label = (labelEl && labelEl.value.trim()) || raw;
+    const target = getLinkTarget();
+    previewEl.innerHTML = `Preview: <a href="${escapeHtml(href)}" target="${target}" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    previewEl.classList.add('visible');
+}
+
+function setupLinkPreview(urlId, labelId, previewId) {
+    const urlEl = document.getElementById(urlId);
+    const labelEl = document.getElementById(labelId);
+    if (!urlEl) return;
+    const handler = () => updateLinkPreview(urlId, labelId, previewId);
+    urlEl.addEventListener('input', handler);
+    if (labelEl) labelEl.addEventListener('input', handler);
+}
+
+function setupAdminPrefs() {
+    setupLinkPreview('newsLinkUrl', 'newsLinkLabel', 'newsLinkPreview');
+    setupLinkPreview('videoLinkUrl', 'videoLinkLabel', 'videoLinkPreview');
+
+    // Initialize the radio from saved value
+    const saved = getLinkTarget();
+    const radios = document.querySelectorAll('input[name="linkTarget"]');
+    radios.forEach(r => { r.checked = (r.value === saved); });
+
+    // Save button
+    const saveBtn = document.getElementById('savePrefsBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const sel = document.querySelector('input[name="linkTarget"]:checked');
+            if (sel) {
+                setLinkTarget(sel.value);
+                // Re-render open views to reflect new target
+                if (document.getElementById('newsGrid')) renderHome();
+                if (document.getElementById('newsList')) renderNewsList();
+                if (document.getElementById('videoGridFull')) renderVideosFull();
+                // Update any open previews
+                updateLinkPreview('newsLinkUrl', 'newsLinkLabel', 'newsLinkPreview');
+                updateLinkPreview('videoLinkUrl', 'videoLinkLabel', 'videoLinkPreview');
+                alert('Link preference saved.');
+            }
+        });
+    }
+}
+
+/* ===== Scroll Animations (IntersectionObserver) ===== */
+function setupScrollAnimations() {
+    // Add the fade-in class to any element with data-animate
+    const targets = document.querySelectorAll('[data-animate]');
+    if (!targets.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+        targets.forEach(el => el.classList.add('visible'));
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    targets.forEach(el => observer.observe(el));
+}
+
+// Run on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupScrollAnimations);
+} else {
+    setupScrollAnimations();
+}
