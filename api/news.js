@@ -2,6 +2,7 @@ const { getData, setData } = require('./_lib/kv');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   const data = await getData();
   if (req.method === 'GET') return res.json(data.news);
   if (req.method === 'POST') {
