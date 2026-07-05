@@ -1,4 +1,4 @@
-const { put, head } = require('@vercel/blob');
+const { put, list } = require('@vercel/blob');
 
 const BLOB_KEY = 'short-news-data.json';
 
@@ -25,23 +25,27 @@ const DEFAULTS = {
 
 async function getData() {
   try {
-    // head() returns blob metadata including the real URL (with hash)
-    const blob = await head(BLOB_KEY);
-    if (!blob || !blob.url) throw new Error('Blob not found');
-    const res = await fetch(blob.url);
+    const result = await list({ prefix: BLOB_KEY });
+    const blobs = result.blobs || [];
+    if (blobs.length === 0) throw new Error('No blobs found');
+
+    // Sort by uploadedAt descending, get the latest
+    blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    const latest = blobs[0];
+
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    const res = await fetch(latest.url, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    });
     if (!res.ok) throw new Error(`Fetch returned ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error('Blob head/fetch failed:', err.message);
-    // First visit — seed defaults to blob storage
-    try {
-      await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
-        contentType: 'application/json',
-        access: 'public',
-      });
-    } catch (e) {
-      console.error('Failed to seed blob:', e.message);
-    }
+    console.error('getData failed:', err.message);
+    // First visit — seed defaults
+    await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
+      contentType: 'application/json',
+      access: 'private',
+    });
     return DEFAULTS;
   }
 }
@@ -49,7 +53,7 @@ async function getData() {
 async function setData(data) {
   await put(BLOB_KEY, JSON.stringify(data), {
     contentType: 'application/json',
-    access: 'public',
+    access: 'private',
   });
 }
 
