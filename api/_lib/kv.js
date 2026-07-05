@@ -1,4 +1,6 @@
-const { put, get: blobGet } = require('@vercel/blob');
+const { put } = require('@vercel/blob');
+const https = require('https');
+const http = require('http');
 
 const BLOB_KEY = 'short-news-data.json';
 
@@ -23,17 +25,45 @@ const DEFAULTS = {
   prefs: { linkTarget: "_blank" }
 };
 
+/* Fetch wrapper for reading the blob */
+function fetchBlob(url) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error('Invalid JSON from blob')); }
+      });
+    }).on('error', reject);
+  });
+}
+
 async function getData() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    console.error('BLOB_READ_WRITE_TOKEN not set');
+    return DEFAULTS;
+  }
   try {
-    const blob = await blobGet(BLOB_KEY);
-    const res = await fetch(blob.url);
+    // Use Vercel Blob REST API directly via fetch with the token
+    const url = `https://blob.vercel-storage.com/${BLOB_KEY}`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Blob GET returned ${res.status}`);
     return await res.json();
   } catch {
-    // First visit — seed defaults
-    await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
-      contentType: 'application/json',
-      access: 'public',
-    });
+    // First visit — seed defaults to blob
+    try {
+      await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
+        contentType: 'application/json',
+        access: 'public',
+      });
+    } catch (e) {
+      console.error('Failed to seed blob:', e.message);
+    }
     return DEFAULTS;
   }
 }
