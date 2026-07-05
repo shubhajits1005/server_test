@@ -1,4 +1,6 @@
-const { kv } = require('@vercel/kv');
+const { put, get: blobGet } = require('@vercel/blob');
+
+const BLOB_KEY = 'short-news-data.json';
 
 const DEFAULTS = {
   news: [
@@ -21,22 +23,26 @@ const DEFAULTS = {
   prefs: { linkTarget: "_blank" }
 };
 
-const KV_KEY = 'short_news_data';
-
 async function getData() {
   try {
-    const data = await kv.get(KV_KEY);
-    if (data) return data;
-    await kv.set(KV_KEY, DEFAULTS);
-    return DEFAULTS;
-  } catch (err) {
-    console.error('KV error:', err);
+    const blob = await blobGet(BLOB_KEY);
+    const res = await fetch(blob.url);
+    return await res.json();
+  } catch {
+    // First visit — seed defaults
+    await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
+      contentType: 'application/json',
+      access: 'public',
+    });
     return DEFAULTS;
   }
 }
 
 async function setData(data) {
-  await kv.set(KV_KEY, data);
+  await put(BLOB_KEY, JSON.stringify(data), {
+    contentType: 'application/json',
+    access: 'public',
+  });
 }
 
 module.exports = { getData, setData };
