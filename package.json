@@ -1,0 +1,7 @@
+{
+  "name": "short-news",
+  "private": true,
+  "dependencies": {
+    "@vercel/kv": "^1.0.1"
+  }
+}
