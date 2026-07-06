@@ -54,11 +54,11 @@ async function getData() {
     return data;
   } catch (err) {
     console.error('getData:', err.message);
-    // No blob exists — seed defaults as a public blob
-    await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
+    // No blob exists (or token missing) — seed defaults
+    put(BLOB_KEY, JSON.stringify(DEFAULTS), {
       contentType: 'application/json',
       access: 'public',
-    });
+    }).catch(e => console.error('Seed put failed:', e.message));
     return DEFAULTS;
   }
 }
