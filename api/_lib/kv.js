@@ -16,10 +16,9 @@ const DEFAULTS = {
     { "id": 2, "title": "Inside the Mars Mission Control", "category": "Science", "thumb": "", "icon": "🚀", "desc": "Behind the scenes with the engineers who pulled off the historic orbital insertion.", "url": "https://www.youtube.com/embed/D8pVLgHaViY" },
     { "id": 3, "title": "Markets Explained in 10 Minutes", "category": "Business", "thumb": "", "icon": "📈", "desc": "A quick, jargon-free tour of how global equity markets actually work.", "url": "https://www.youtube.com/embed/ZCFkWDdmXG8" },
     { "id": 4, "title": "Quantum Computing for Beginners", "category": "Science", "thumb": "", "icon": "⚛️", "desc": "Qubits, superposition, and entanglement — explained without the math.", "url": "https://www.youtube.com/embed/QuR969cFz_g" },
-    { "id": 5, "title": "Climate Tech: What Actually Works", "category": "World", "thumb": "", "icon": "🌍", "desc": "A grounded look at which climate technologies are delivering real emissions cuts.", "url": "https://www.youtube.com/embed/1LaJ5DDmsvk" },
-    { "id": 6, "title": "Top 10 Goals of the Season", "category": "Sports", "thumb": "", "icon": "⚽", "desc": "A countdown of the most spectacular goals from this season's championships.", "url": "https://www.youtube.com/embed/2vjPBrBU-TM" }
+    { "id": 5, "title": "Top 10 Goals of the Season", "category": "Sports", "thumb": "", "icon": "⚽", "desc": "A countdown of the most spectacular goals from this season's championships.", "url": "https://www.youtube.com/embed/2vjPBrBU-TM" }
   ],
-  credentials: { username: "admin", password: "admin123" },
+  credentials: { username: "shubho", password: "11223344" },
   prefs: { linkTarget: "_blank" }
 };
 
@@ -29,22 +28,36 @@ async function getData() {
     const blobs = result.blobs || [];
     if (blobs.length === 0) throw new Error('No blobs');
 
-    // Blobs are sorted newest-first by default
     const latest = blobs[0];
     const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-    // Private blobs need auth header to read
-    const res = await fetch(latest.url, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-    });
+    // Try public read first; fall back to Bearer auth (migrating existing private blobs)
+    let res = await fetch(latest.url);
+    let needsMigration = false;
+    if (!res.ok && token) {
+      res = await fetch(latest.url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      needsMigration = true;
+    }
     if (!res.ok) throw new Error(`Fetch returned ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+
+    // One-time migration: re-write existing private blob as public
+    if (needsMigration) {
+      await put(BLOB_KEY, JSON.stringify(data), {
+        contentType: 'application/json',
+        access: 'public',
+      }).catch(err => console.error('Blob public migration failed:', err.message));
+    }
+
+    return data;
   } catch (err) {
     console.error('getData:', err.message);
-    // First visit — seed defaults
+    // No blob exists — seed defaults as a public blob
     await put(BLOB_KEY, JSON.stringify(DEFAULTS), {
       contentType: 'application/json',
-      access: 'private',
+      access: 'public',
     });
     return DEFAULTS;
   }
@@ -53,7 +66,7 @@ async function getData() {
 async function setData(data) {
   await put(BLOB_KEY, JSON.stringify(data), {
     contentType: 'application/json',
-    access: 'private',
+    access: 'public',
   });
 }
 
