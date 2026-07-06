@@ -1,4 +1,4 @@
-/* ===== Storage (server-based via Vercel KV) ===== */
+/* ===== Storage (server-based via Vercel Blob) ===== */
 
 let __linkTarget = '_blank';
 
@@ -11,9 +11,9 @@ async function api(url, data) {
     });
     return res.json();
   }
-  // Cache-busting: add timestamp to prevent Vercel CDN caching
-  const separator = url.includes('?') ? '&' : '?';
-  const res = await fetch(url + separator + '_=' + Date.now());
+  // Cache-busting: prevent stale CDN responses
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(url + sep + '_=' + Date.now());
   return res.json();
 }
 
